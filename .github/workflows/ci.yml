@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl
+      - name: Parse the build script
+        run: python -m py_compile scripts/build_template.py
+      - name: Rebuild the workbook and the questionnaire exports
+        run: python scripts/build_template.py
+      - name: Generated questionnaire files must match the committed ones
+        run: git diff --exit-code -- questionnaire/vendor-questionnaire.csv questionnaire/vendor-questionnaire.md
+      - name: Verify the workbook structure, formulas and absence of macros
+        run: |
+          python - <<'EOF'
+          import csv
+          from openpyxl import load_workbook
+          wb = load_workbook("Vendor-Risk-Assessment-Template.xlsx")
+          expected = ["01_Methodology", "02_Vendor_Inventory", "03_Questionnaire", "04_Assessment_Summary",
+                      "05_Contract_Clauses_Checklist", "06_Dashboard"]
+          assert wb.sheetnames == expected, wb.sheetnames
+          assert not getattr(wb, "vba_archive", None), "workbook must not contain macros"
+          q = wb["03_Questionnaire"]
+          ids = [q.cell(row=r, column=1).value for r in range(22, 82)]
+          assert len(ids) == 60 and all(ids), "questionnaire must hold 60 question IDs"
+          with open("questionnaire/vendor-questionnaire.csv", newline="", encoding="utf-8") as fh:
+              rows = list(csv.DictReader(fh))
+          assert [r["id"] for r in rows] == ids, "CSV questions must match the workbook"
+          for ws in wb:
+              for row in ws.iter_rows():
+                  for c in row:
+                      assert not (isinstance(c.value, str) and c.value.startswith("#")), f"{ws.title}!{c.coordinate}"
+          formulas = sum(1 for ws in wb for row in ws.iter_rows() for c in row if isinstance(c.value, str) and c.value.startswith("="))
+          assert formulas > 250, formulas
+          print("OK:", wb.sheetnames, "formulas:", formulas, "questions:", len(ids))
+          EOF

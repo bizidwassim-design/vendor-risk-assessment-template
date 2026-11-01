@@ -47,7 +47,7 @@ jobs:
           assert formulas > 250, formulas
           print("OK:", wb.sheetnames, "formulas:", formulas, "questions:", len(ids))
           EOF
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Web app data file is generated from the build script and up to date

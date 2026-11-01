@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml/badge.svg)](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml) [![Fictional data](https://img.shields.io/badge/sample%20data-fictional-informational)](SECURITY.md) [![Live](https://img.shields.io/badge/live-GitHub%20Pages-2f5597)](https://bizidwassim-design.github.io/vendor-risk-assessment-template/)
 
+[![Demo](https://img.shields.io/badge/demo-open%20the%20live%20app-2F80ED?style=for-the-badge&logo=githubpages&logoColor=white)](https://bizidwassim-design.github.io/vendor-risk-assessment-template/)
+
 A free, open-source **third-party risk management** kit: tier your vendors by inherent risk, send them a
 60-question security questionnaire, score the answers, derive a residual rating, check the contract and report
 on a dashboard. One Excel workbook (no macros), a sendable questionnaire in Markdown and CSV, and a standards map

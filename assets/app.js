@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var T = window.TPRM;
-  var STORAGE = "tprm-draft", SCHEMA = "vendor-risk-assessment/1.0";
+  var STORAGE = "tprm-draft", SCHEMA = "vendor-risk-assessment/1.0", BLANK_KEY = "tprm-blank";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var factor = function (key, label) { var row = T.factors[key].filter(function (f) { return f[0] === label; })[0]; return row ? row[1] : null; };
   var ANSWER_SCORE = { "Yes": 1, "Partial": 0.5, "No": 0 };
@@ -242,16 +242,19 @@
     $("#q-override").addEventListener("change", function (e) { var v = currentVendor(); if (v) { assessment(v.id).override = e.target.value; save(); renderQuestionnaire(); renderDashboard(); } });
     $("#q-override-reason").addEventListener("input", function (e) { var v = currentVendor(); if (v) { assessment(v.id).overrideReason = e.target.value; save(); } });
     $("#btn-add-vendor").addEventListener("click", function () { state.vendors.push(blankVendor()); save(); renderInventory(); renderVendorSelects(); renderDashboard(); });
-    $("#btn-sample").addEventListener("click", function () { loadSample(); renderAll(); showTab("tab-questionnaire"); say("Sample loaded: six fictional vendors, worked questionnaire for " + T.sample.vendor + "."); });
+    $("#btn-sample").addEventListener("click", function () { loadSample(); renderAll(); showTab("tab-dashboard"); $("#demo-banner").hidden = false; say("Sample loaded: six fictional vendors, worked questionnaire for " + T.sample.vendor + "."); });
+    $("#btn-start-blank").addEventListener("click", function () { state = { vendors: [], assessments: {}, current: "" }; try { localStorage.removeItem(STORAGE); localStorage.setItem(BLANK_KEY, "1"); } catch (e) { /* ignore */ } $("#demo-banner").hidden = true; renderAll(); showTab("tab-inventory"); say("Blank assessment: add your vendors in the inventory."); });
     $("#btn-export").addEventListener("click", function () { download("tprm-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify({ schema: SCHEMA, exported: new Date().toISOString(), vendors: state.vendors, assessments: state.assessments, current: state.current }, null, 2)); say("JSON exported."); });
     $("#btn-export-csv").addEventListener("click", function () { download("tprm-summary.csv", summaryCsv(), "text/csv"); say("Summary CSV exported."); });
     $("#file-import").addEventListener("change", function (e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { try { var n = importDoc(JSON.parse(r.result)); save(); renderAll(); say("Imported " + n + " vendors."); } catch (err) { say("Import failed: " + err.message); } e.target.value = ""; }; r.readAsText(f); });
     $("#btn-print").addEventListener("click", function () { window.print(); });
-    $("#btn-reset").addEventListener("click", function () { state = { vendors: [], assessments: {}, current: "" }; try { localStorage.removeItem(STORAGE); } catch (e) { /* ignore */ } renderAll(); say("Reset."); });
+    $("#btn-reset").addEventListener("click", function () { state = { vendors: [], assessments: {}, current: "" }; try { localStorage.removeItem(STORAGE); localStorage.setItem(BLANK_KEY, "1"); } catch (e) { /* ignore */ } $("#demo-banner").hidden = true; renderAll(); say("Reset."); });
     var saved = null; try { saved = localStorage.getItem("tprm-theme"); } catch (e) { /* ignore */ }
     applyTheme(saved);
     $("#theme-toggle").addEventListener("click", function () { var cur = document.documentElement.getAttribute("data-theme"); var dark = cur === "dark" || (!cur && window.matchMedia("(prefers-color-scheme: dark)").matches); var next = dark ? "light" : "dark"; try { localStorage.setItem("tprm-theme", next); } catch (e) { /* ignore */ } applyTheme(next); });
-    if (/[?&]sample=1/.test(location.search) && !state.vendors.length) { loadSample(); renderAll(); showTab("tab-questionnaire"); } else renderAll();
+    var blank = false; try { blank = localStorage.getItem(BLANK_KEY) === "1"; } catch (e) { /* ignore */ }
+    /* first visit opens on the fictional sample, on the dashboard, so the results are visible straight away */
+    if (!state.vendors.length && (/[?&]sample=1/.test(location.search) || !blank)) { loadSample(); renderAll(); showTab("tab-dashboard"); $("#demo-banner").hidden = false; } else renderAll();
   }
   document.addEventListener("DOMContentLoaded", init);
 })();

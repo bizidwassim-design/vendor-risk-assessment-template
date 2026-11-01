@@ -5,6 +5,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The first visit opens on the fictional sample, with a banner and a *Start with a blank assessment* button that is remembered, so visitors see real-looking results straight away.
+
 ### Added
 - Web app (`index.html`, `assets/`, `data/tprm.js`): inventory and tiering, the 60-question questionnaire with domain scores, band and residual rating, contract-clause checklist per tier, dashboard with coverage and overdue reviews, JSON export/import, CSV summary, print, local draft, light and dark themes, strict CSP. Hosted on GitHub Pages.
 - `scripts/build_web_data.py` generates `data/tprm.js` from the build script; CI checks it is current, syntax-checks the app and validates the HTML.

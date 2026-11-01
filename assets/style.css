@@ -126,3 +126,7 @@ tr.w3no td { background: color-mix(in srgb, var(--danger) 9%, transparent); }
   th { position: static; }
   select, input, textarea { border: 0; padding: 0; background: transparent; appearance: none; }
 }
+
+/* sample-data banner shown on first visit */
+.demo-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 0; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+.demo-banner[hidden] { display: none; }

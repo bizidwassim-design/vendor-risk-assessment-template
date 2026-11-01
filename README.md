@@ -137,6 +137,13 @@ This template supports, but does not replace, legal review of contracts, profess
 audit. A questionnaire measures what a vendor says; evidence and contract terms are what protect you. Use roles, not
 names, and keep vendor evidence outside this file.
 
+## AI assistance
+
+Built with Claude Code as a coding and writing assistant, which is why it appears as a co-author on some commits.
+**Editor and reviewer: Wassim Bizid**, who set the scope, the frameworks and the GRC approach, edited the content
+and decided what was published. Automated tests in CI check the published outputs. This is a maintainer review,
+not an independent one.
+
 ## License
 
 [MIT](LICENSE) — free to use, copy, modify and redistribute.

@@ -1,17 +1,23 @@
 # Vendor Risk Assessment Template (TPRM)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml/badge.svg)](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml) [![Fictional data](https://img.shields.io/badge/sample%20data-fictional-informational)](SECURITY.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml/badge.svg)](https://github.com/bizidwassim-design/vendor-risk-assessment-template/actions/workflows/ci.yml) [![Fictional data](https://img.shields.io/badge/sample%20data-fictional-informational)](SECURITY.md) [![Live](https://img.shields.io/badge/live-GitHub%20Pages-2f5597)](https://bizidwassim-design.github.io/vendor-risk-assessment-template/)
 
 A free, open-source **third-party risk management** kit: tier your vendors by inherent risk, send them a
 60-question security questionnaire, score the answers, derive a residual rating, check the contract and report
 on a dashboard. One Excel workbook (no macros), a sendable questionnaire in Markdown and CSV, and a standards map
-to **ISO/IEC 27001:2022**, **NIST CSF 2.0**, **SOC 2** and **ISO/IEC 42001:2023**.
+to **ISO/IEC 27001:2022**, **NIST CSF 2.0**, **SOC 2** and **ISO/IEC 42001:2023**. The same model also runs as a
+**web app**, one static page with no build and no server: **[use it online](https://bizidwassim-design.github.io/vendor-risk-assessment-template/)**
+(append `?sample=1` for the worked example).
+
+![Web app: questionnaire view with tier, score, band, residual rating and domain bars](docs/screenshot.png)
 
 > 🇫🇷 Résumé en français en bas de page.
 
 ## Layout
 
 ```
+index.html, assets/, data/tprm.js     the web app (strict Content-Security-Policy, no external resources; data file generated)
+scripts/build_web_data.py              writes data/tprm.js from the build script so the app and the workbook never drift
 Vendor-Risk-Assessment-Template.xlsx   the workbook (generated - do not edit by hand)
 scripts/build_template.py              generates the workbook and the questionnaire exports (openpyxl)
 questionnaire/vendor-questionnaire.md  the same 60 questions as a form you can send to a vendor
@@ -20,6 +26,12 @@ docs/standards-mapping.md              what each sheet gives you for ISO 27001, 
 ```
 
 ## Quick start
+
+**Online:** open the [web app](https://bizidwassim-design.github.io/vendor-risk-assessment-template/), add your vendors in
+*Inventory*, answer the questionnaire per vendor, tick the contract clauses, read the dashboard; export JSON to keep a dated
+record. Nothing is sent anywhere; the draft stays in your browser.
+
+**Workbook:**
 
 1. Download `Vendor-Risk-Assessment-Template.xlsx` and open it in Excel, LibreOffice or Google Sheets.
 2. Read `01_Methodology`; adjust the factor values and review cadence if your policy differs.

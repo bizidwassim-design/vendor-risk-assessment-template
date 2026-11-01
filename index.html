@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Third-party risk management in the browser: tier your vendors by inherent risk, score a 60-question security questionnaire, derive a residual rating, check contract clauses and report on a dashboard. Nothing leaves your browser.">
+  <meta name="color-scheme" content="light dark">
+  <title>Vendor Risk Assessment (TPRM)</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#panels">Skip to the assessment</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <div>
+        <h1>Vendor Risk Assessment (TPRM)</h1>
+        <p class="tagline">Tiering · 60-question questionnaire · residual rating · contract clauses · dashboard. Aligned with ISO/IEC 27001 A.5.19–A.5.23, NIST CSF 2.0 GV.SC, SOC 2 CC9.2 and ISO/IEC 42001 A.10. Nothing leaves your browser.</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="theme-toggle" class="btn btn-ghost" aria-pressed="false">Dark theme</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card intro" aria-labelledby="how-title">
+      <h2 id="how-title">How it works</h2>
+      <p>
+        <strong>1 Inventory:</strong> list your vendors and pick four risk factors; the inherent score and tier are computed.
+        <strong>2 Questionnaire:</strong> select a vendor and enter the answers; domain scores, overall score, band and residual rating update as you go.
+        <strong>3 Contract:</strong> tick the clauses present in the signed contract; missing required clauses are counted per tier.
+        <strong>4 Dashboard:</strong> vendors by tier and rating, Tier 1 coverage, overdue reviews.
+        A draft is kept in this browser; export JSON to keep a dated record. The same model drives the
+        <a href="Vendor-Risk-Assessment-Template.xlsx">Excel workbook</a> in this repository.
+      </p>
+      <p class="btn-row">
+        <button type="button" id="btn-sample" class="btn">Load the six fictional vendors and a worked assessment</button>
+        <span class="muted">Sample data only, to see what a filled assessment looks like.</span>
+      </p>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" id="tab-inventory" aria-controls="panel-inventory" aria-selected="true">1 · Inventory and tiering</button>
+      <button type="button" role="tab" id="tab-questionnaire" aria-controls="panel-questionnaire" aria-selected="false">2 · Questionnaire</button>
+      <button type="button" role="tab" id="tab-contract" aria-controls="panel-contract" aria-selected="false">3 · Contract clauses</button>
+      <button type="button" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="false">4 · Dashboard</button>
+    </div>
+
+    <div id="panels">
+      <section class="panel" id="panel-inventory" role="tabpanel" aria-labelledby="tab-inventory">
+        <div class="card">
+          <h2>Vendor inventory</h2>
+          <p class="muted">Inherent score = data classification × business criticality × access type × AI use (1–128). Tier 1 from <span id="t1min"></span>, Tier 2 from <span id="t2min"></span>, Tier 3 below. AI use doubles the score on purpose.</p>
+          <div class="table-wrap">
+            <table id="inventory-table">
+              <thead>
+                <tr><th scope="col">Id</th><th scope="col">Vendor</th><th scope="col">Service</th><th scope="col">Category</th><th scope="col">Owner (role)</th><th scope="col">Data</th><th scope="col">Criticality</th><th scope="col">Access</th><th scope="col">AI</th><th scope="col">Score</th><th scope="col">Tier</th><th scope="col">Contract end</th><th scope="col">Status</th><th scope="col"></th></tr>
+              </thead>
+              <tbody id="inventory-body"></tbody>
+            </table>
+          </div>
+          <p class="btn-row"><button type="button" id="btn-add-vendor" class="btn">Add a vendor</button></p>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-questionnaire" role="tabpanel" aria-labelledby="tab-questionnaire" hidden>
+        <div class="card">
+          <div class="vendor-bar">
+            <label>Vendor <select id="q-vendor"></select></label>
+            <label>Assessment date <input type="date" id="q-date"></label>
+            <label>Assessor (role) <input type="text" id="q-assessor" placeholder="e.g. Security Analyst, GRC team"></label>
+            <label>Assessment status <select id="q-status"></select></label>
+          </div>
+          <div class="kpis" id="q-kpis" aria-live="polite"></div>
+          <div class="bars" id="q-bars"></div>
+          <h3>Residual rating</h3>
+          <div class="field-grid">
+            <label>Computed rating <input type="text" id="q-computed" readonly></label>
+            <label>Override rating <select id="q-override"><option value="">— none —</option></select></label>
+            <label>Override reason <input type="text" id="q-override-reason" placeholder="Required when overriding"></label>
+            <label>Final rating <input type="text" id="q-final" readonly></label>
+          </div>
+          <p class="hint">Yes = 1, Partial = 0.5, No = 0, N/A excluded. Strong ≥ 85 %, Adequate ≥ 70 %, Weak ≥ 50 %, Poor below. A Tier 1 vendor never rates Low. Weight-3 questions answered No are highlighted.</p>
+          <div class="table-wrap">
+            <table id="q-table">
+              <thead><tr><th scope="col">Id</th><th scope="col">Question</th><th scope="col">W</th><th scope="col">Evidence requested</th><th scope="col">Answer</th><th scope="col">Comment / evidence reviewed</th></tr></thead>
+              <tbody id="q-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-contract" role="tabpanel" aria-labelledby="tab-contract" hidden>
+        <div class="card">
+          <div class="vendor-bar">
+            <label>Vendor <select id="c-vendor"></select></label>
+            <p class="muted" id="c-meta"></p>
+          </div>
+          <div class="table-wrap">
+            <table id="c-table">
+              <thead><tr><th scope="col">Id</th><th scope="col">Clause</th><th scope="col">Why it matters</th><th scope="col">Level for this tier</th><th scope="col">In contract?</th></tr></thead>
+              <tbody id="c-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" hidden>
+        <div class="card">
+          <h2>Dashboard</h2>
+          <div class="kpis" id="d-kpis"></div>
+          <div class="counts" id="d-counts"></div>
+          <h3>Assessment summary</h3>
+          <div class="table-wrap">
+            <table id="d-table">
+              <thead><tr><th scope="col">Id</th><th scope="col">Vendor</th><th scope="col">Tier</th><th scope="col">Score</th><th scope="col">Band</th><th scope="col">Final rating</th><th scope="col">Status</th><th scope="col">Assessed</th><th scope="col">Next review</th><th scope="col">Missing required clauses</th></tr></thead>
+              <tbody id="d-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card actions" aria-labelledby="actions-title">
+      <h2 id="actions-title">Save, load, print</h2>
+      <div class="btn-row">
+        <button type="button" id="btn-export" class="btn btn-primary">Export JSON</button>
+        <button type="button" id="btn-export-csv" class="btn">Export summary CSV</button>
+        <label class="btn file-btn">Import JSON<input type="file" id="file-import" accept="application/json,.json"></label>
+        <button type="button" id="btn-print" class="btn">Print</button>
+        <button type="button" id="btn-reset" class="btn btn-danger">Reset</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>Open source under the MIT License. All sample vendors are fictional. A questionnaire measures what a vendor says; evidence and contract terms are what protect you. No data is transmitted: the page's Content-Security-Policy blocks all network requests.</p>
+  </footer>
+
+  <script src="data/tprm.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

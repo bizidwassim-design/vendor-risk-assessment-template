@@ -13,3 +13,7 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Node (html-validate runs through npx)
+node_modules/
+package-lock.json

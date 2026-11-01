@@ -47,3 +47,22 @@ jobs:
           assert formulas > 250, formulas
           print("OK:", wb.sheetnames, "formulas:", formulas, "questions:", len(ids))
           EOF
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Web app data file is generated from the build script and up to date
+        run: |
+          python scripts/build_web_data.py
+          git diff --exit-code -- data/tprm.js
+      - name: Syntax-check the web app
+        run: |
+          node --check assets/app.js
+          node --check data/tprm.js
+      - name: HTML is valid (html-validate, recommended preset)
+        run: npx --yes html-validate@8 index.html
+      - name: No external resources or inline scripts (CSP stays meaningful)
+        run: |
+          ! grep -Ei '<(script|link)[^>]+(src|href)="(https?:)?//' index.html
+          ! grep -Ei '<script>' index.html
+          ! grep -Ei '@import|url\(https?:' assets/style.css
+          echo "OK: all resources are local"

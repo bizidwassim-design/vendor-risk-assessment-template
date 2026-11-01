@@ -177,11 +177,32 @@
     [["Vendors", String(state.vendors.length), "in the inventory"], ["Tier 1 coverage", t1 ? t1done + " / " + t1 : "—", "complete assessments"], ["Overdue reviews", String(over), "next review in the past, not complete"],
      ["Assessments complete", complete + " / " + state.vendors.length, ""], ["Critical or High", String((byRating.Critical || 0) + (byRating.High || 0)), "final rating"]]
       .forEach(function (k) { kp.appendChild(el("div", { class: "kpi" }, [el("small", { text: k[0] }), el("b", { text: k[1] }), el("small", { text: k[2] })])); });
-    function countTable(title, order, map) {
-      var t = el("table", null, [el("thead", null, [el("tr", null, [el("th", { text: title }), el("th", { text: "Vendors" })])])]);
-      var tb = el("tbody"); order.forEach(function (k) { tb.appendChild(el("tr", null, [el("td", null, [pill(k)]), el("td", { text: String(map[k] || 0) })])); }); t.appendChild(tb); return t;
+    function distribution(title, subtitle, order, map) {
+      var box = el("section", { class: "distribution", "aria-label": title }, [el("h3", { text: title }), el("p", { class: "muted", text: subtitle })]);
+      order.forEach(function (k) {
+        var value = map[k] || 0, total = state.vendors.length;
+        box.appendChild(el("div", { class: "distribution-row", "data-rating": k }, [
+          el("div", { class: "distribution-label" }, [pill(k), el("span", { text: value + " vendor" + (value === 1 ? "" : "s") })]),
+          el("progress", { max: String(total || 1), value: String(value), "aria-label": k + ": " + value + " of " + total + " vendors" })
+        ]));
+      });
+      var classified = order.reduce(function (n, k) { return n + (map[k] || 0); }, 0);
+      box.appendChild(el("p", { class: "distribution-footnote", text: (state.vendors.length - classified) + " not yet classified · proportions of all vendors" }));
+      return box;
     }
-    counts.appendChild(countTable("By inherent tier", TIER_ORDER, byTier)); counts.appendChild(countTable("By final rating", RATING_ORDER, byRating));
+    counts.appendChild(distribution("Inherent exposure", "Vendor criticality before control assessment", TIER_ORDER, byTier));
+    counts.appendChild(distribution("Residual risk profile", "Final ratings after assessment and overrides", RATING_ORDER, byRating));
+    var queue = el("section", { class: "distribution review-queue", "aria-label": "Review priorities" }, [el("h3", { text: "Review priorities" }), el("p", { class: "muted", text: "Where your next conversation starts" })]);
+    var pending = state.vendors.filter(function (v) { var a = assessment(v.id); return overdue(v, a) || finalRating(v, a) === "Critical" || finalRating(v, a) === "High"; });
+    pending.sort(function (a, b) { return Number(overdue(b, assessment(b.id))) - Number(overdue(a, assessment(a.id))); });
+    pending.slice(0, 3).forEach(function (v) {
+      var a = assessment(v.id), reason = overdue(v, a) ? "Review overdue" : finalRating(v, a) + " residual risk";
+      var button = el("button", { type: "button", class: "queue-item", "aria-label": "Review " + (v.name || v.id) }, [el("span", { class: "vendor-avatar", "aria-hidden": "true", text: (v.name || v.id).slice(0, 2).toUpperCase() }), el("span", { class: "queue-copy" }, [el("strong", { text: v.name || v.id }), el("small", { text: reason })]), el("span", { "aria-hidden": "true", text: "↗" })]);
+      button.addEventListener("click", function () { state.current = v.id; save(); renderVendorSelects(); renderQuestionnaire(); renderContract(); showTab("tab-questionnaire"); $("#q-vendor").focus(); });
+      queue.appendChild(button);
+    });
+    queue.appendChild(el("p", { class: "distribution-footnote", text: pending.length ? pending.length + " vendors flagged · overdue reviews shown first" : "No high/critical ratings or overdue reviews flagged. Unassessed vendors still need review." }));
+    counts.appendChild(queue);
     state.vendors.forEach(function (v) {
       var a = assessment(v.id), sc = score(a), m = missingRequired(v, a);
       body.appendChild(el("tr", null, [el("td", { class: "id", text: v.id }), el("td", { text: v.name }), el("td", null, [pill(tierOf(v))]), el("td", { text: sc.pct == null ? "—" : sc.pct + " %" }), el("td", { text: sc.band || "—" }),
@@ -250,7 +271,7 @@
     $("#btn-print").addEventListener("click", function () { window.print(); });
     $("#btn-reset").addEventListener("click", function () { state = { vendors: [], assessments: {}, current: "" }; try { localStorage.removeItem(STORAGE); localStorage.setItem(BLANK_KEY, "1"); } catch (e) { /* ignore */ } $("#demo-banner").hidden = true; renderAll(); say("Reset."); });
     var saved = null; try { saved = localStorage.getItem("tprm-theme"); } catch (e) { /* ignore */ }
-    applyTheme(saved);
+    applyTheme(saved || "light");
     $("#theme-toggle").addEventListener("click", function () { var cur = document.documentElement.getAttribute("data-theme"); var dark = cur === "dark" || (!cur && window.matchMedia("(prefers-color-scheme: dark)").matches); var next = dark ? "light" : "dark"; try { localStorage.setItem("tprm-theme", next); } catch (e) { /* ignore */ } applyTheme(next); });
     var blank = false; try { blank = localStorage.getItem(BLANK_KEY) === "1"; } catch (e) { /* ignore */ }
     /* first visit opens on the fictional sample, on the dashboard, so the results are visible straight away */
@@ -258,3 +279,4 @@
   }
   document.addEventListener("DOMContentLoaded", init);
 })();
+

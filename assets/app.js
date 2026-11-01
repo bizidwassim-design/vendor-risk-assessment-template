@@ -20,7 +20,7 @@
     return state.assessments[id];
   }
   function save() { try { localStorage.setItem(STORAGE, JSON.stringify(state)); } catch (e) { /* private mode */ } }
-  function load() { try { var s = JSON.parse(localStorage.getItem(STORAGE) || "null"); if (s && s.vendors) state = s; } catch (e) { /* ignore */ } }
+  function load() { try { var s = JSON.parse(localStorage.getItem(STORAGE) || "null"); if (s && s.vendors) importDoc(s); } catch (e) { /* unreadable saved state: keep the default */ } }
 
   /* ---------- model ---------- */
   function inherent(v) {
@@ -44,10 +44,27 @@
     return { pct: pct, band: band, w3no: w3no, answered: answered, byDomain: byDomain };
   }
   function computedRating(tier, band) { return (tier && band && T.residual[tier]) ? T.residual[tier][band] : ""; }
-  function finalRating(v, a) { var r = computedRating(tierOf(v), score(a).band); return a.override || r; }
-  function addMonths(iso, m) { if (!iso) return ""; var d = new Date(iso + "T00:00:00"); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 10); }
+  function overrideReason(a) { return String(a.overrideReason || "").trim(); }
+  function overrideActive(a) { return !!a.override && !!overrideReason(a); }
+  function finalRating(v, a) { var r = computedRating(tierOf(v), score(a).band); return overrideActive(a) ? a.override : r; }
+  /* Dates are calendar dates (YYYY-MM-DD), never instants: no Date parsing, no UTC conversion, so the result is
+     the same in every timezone. Month-end rule: the day is clamped to the last day of the target month
+     (2026-01-31 + 1 month = 2026-02-28). */
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function isIsoDate(iso) {
+    var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); if (!p) return false;
+    var mo = +p[2], d = +p[3]; return mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(+p[1], mo - 1);
+  }
+  function daysInMonth(y, m0) { return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m0]; }
+  function addMonths(iso, m) {
+    if (!isIsoDate(iso)) return "";
+    var y = +iso.slice(0, 4), m0 = +iso.slice(5, 7) - 1 + m, d = +iso.slice(8, 10);
+    y += Math.floor(m0 / 12); m0 = ((m0 % 12) + 12) % 12;
+    return y + "-" + pad2(m0 + 1) + "-" + pad2(Math.min(d, daysInMonth(y, m0)));
+  }
+  function todayIso() { var t = new Date(); return t.getFullYear() + "-" + pad2(t.getMonth() + 1) + "-" + pad2(t.getDate()); }
   function nextReview(v, a) { var t = tierOf(v); return t && a.date ? addMonths(a.date, T.cadence[t]) : ""; }
-  function overdue(v, a) { var n = nextReview(v, a); return !!n && n < new Date().toISOString().slice(0, 10) && a.status !== "Complete"; }
+  function overdue(v, a) { var n = nextReview(v, a); return !!n && n < todayIso() && a.status !== "Complete"; }
   function clauseLevel(cl, tier) { return T.clauseLevels[cl[tier]] || ""; }
   function missingRequired(v, a) { var t = tierOf(v); if (!t) return null; return T.clauses.filter(function (c) { return c[t] === "R" && a.clauses[c.id] !== "Y"; }).length; }
 
@@ -112,6 +129,14 @@
   function currentVendor() { return state.vendors.filter(function (v) { return v.id === state.current; })[0] || null; }
 
   /* ---------- questionnaire ---------- */
+  /* The override only takes effect once a reason is given; the field is flagged until then. */
+  function syncOverride(v, a) {
+    var comp = computedRating(tierOf(v), score(a).band);
+    $("#q-final").value = overrideActive(a) ? a.override + " (override)" : (a.override ? (comp || "—") + " (override ignored: add a reason)" : comp);
+    var reason = $("#q-override-reason"), missing = !!a.override && !overrideReason(a);
+    reason.required = !!a.override; reason.setAttribute("aria-invalid", missing ? "true" : "false");
+    reason.setCustomValidity(missing ? "A reason is required when overriding the computed rating." : "");
+  }
   function renderQuestionnaire() {
     var v = currentVendor(), body = $("#q-body"); body.textContent = "";
     var kp = $("#q-kpis"), bars = $("#q-bars"); kp.textContent = ""; bars.textContent = "";
@@ -123,7 +148,7 @@
     function refreshScores() {
       var sc = score(a), tier = tierOf(v), comp = computedRating(tier, sc.band);
       $("#q-computed").value = comp || (tier ? "answer the questionnaire" : "set the four factors in the inventory");
-      $("#q-final").value = a.override ? a.override + " (override)" : comp;
+      syncOverride(v, a);
       kp.textContent = "";
       [["Inherent tier", tier || "—", "from the inventory"], ["Overall score", sc.pct == null ? "—" : sc.pct + " %", "weighted, N/A excluded"], ["Score band", sc.band || "—", "Strong · Adequate · Weak · Poor"],
        ["Answered", sc.answered + " / " + T.questions.length, "questions"], ["Weight-3 answered No", String(sc.w3no), "critical controls missing"], ["Next review", nextReview(v, a) || "—", "assessment date + cadence"]]
@@ -218,14 +243,50 @@
   function download(name, text, type) { var b = new Blob([text], { type: type || "application/json" }); var a = el("a", { href: URL.createObjectURL(b), download: name }); document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   function cell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function summaryCsv() {
-    var lines = [["id", "vendor", "tier", "inherent_score", "score_pct", "band", "computed_rating", "override", "final_rating", "status", "assessed", "next_review", "overdue", "missing_required_clauses"].join(",")];
-    state.vendors.forEach(function (v) { var a = assessment(v.id), sc = score(a); lines.push([v.id, v.name, tierOf(v), inherent(v), sc.pct, sc.band, computedRating(tierOf(v), sc.band), a.override, finalRating(v, a), a.status, a.date, nextReview(v, a), overdue(v, a) ? "yes" : "no", missingRequired(v, a)].map(cell).join(",")); });
+    var lines = [["id", "vendor", "tier", "inherent_score", "score_pct", "band", "computed_rating", "override", "override_reason", "final_rating", "status", "assessed", "next_review", "overdue", "missing_required_clauses"].join(",")];
+    state.vendors.forEach(function (v) { var a = assessment(v.id), sc = score(a); lines.push([v.id, v.name, tierOf(v), inherent(v), sc.pct, sc.band, computedRating(tierOf(v), sc.band), a.override, a.overrideReason, finalRating(v, a), a.status, a.date, nextReview(v, a), overdue(v, a) ? "yes" : "no", missingRequired(v, a)].map(cell).join(",")); });
     return lines.join("\n");
   }
+  function isObj(x) { return !!x && typeof x === "object" && !Array.isArray(x); }
+  var VENDOR_TEXT = ["id", "name", "service", "category", "owner", "data", "crit", "access", "ai", "location", "contractEnd", "status", "notes"];
+  /* Returns a list of problems; empty means the document is safe to load. Nothing is changed until it passes. */
+  function validateDoc(doc) {
+    var errs = [];
+    if (!isObj(doc)) return ["the file is not a JSON object"];
+    if (!Array.isArray(doc.vendors)) return ["missing \"vendors\" list"];
+    var ids = {};
+    doc.vendors.forEach(function (v, i) {
+      var at = "vendor #" + (i + 1);
+      if (!isObj(v)) { errs.push(at + " is not an object"); return; }
+      if (typeof v.id !== "string" || !v.id.trim()) errs.push(at + " has no id");
+      else if (ids[v.id]) errs.push(at + " repeats id " + v.id); else ids[v.id] = true;
+      VENDOR_TEXT.forEach(function (k) { if (v[k] != null && typeof v[k] !== "string") errs.push(at + ": " + k + " must be text"); });
+      if (v.contractEnd && !isIsoDate(v.contractEnd)) errs.push(at + ": contractEnd must be YYYY-MM-DD");
+    });
+    if (doc.assessments != null && !isObj(doc.assessments)) errs.push("\"assessments\" must be an object");
+    else Object.keys(doc.assessments || {}).forEach(function (id) {
+      var a = doc.assessments[id], at = "assessment " + id;
+      if (!isObj(a)) { errs.push(at + " is not an object"); return; }
+      if (!ids[id]) errs.push(at + " has no matching vendor");
+      if (a.date && !isIsoDate(a.date)) errs.push(at + ": date must be YYYY-MM-DD");
+      ["answers", "comments", "clauses"].forEach(function (k) { if (a[k] != null && !isObj(a[k])) errs.push(at + ": " + k + " must be an object"); });
+      ["assessor", "status", "overrideReason"].forEach(function (k) { if (a[k] != null && typeof a[k] !== "string") errs.push(at + ": " + k + " must be text"); });
+      if (a.override && RATING_ORDER.indexOf(a.override) < 0) errs.push(at + ": override must be one of " + RATING_ORDER.join(", "));
+      if (a.override && !String(a.overrideReason || "").trim()) errs.push(at + ": override " + a.override + " has no reason");
+    });
+    if (doc.current != null && typeof doc.current !== "string") errs.push("\"current\" must be text");
+    return errs;
+  }
   function importDoc(doc) {
-    if (!doc || !Array.isArray(doc.vendors)) throw new Error("Not a TPRM export (missing vendors).");
-    state = { vendors: doc.vendors, assessments: doc.assessments || {}, current: doc.current || "" };
-    return doc.vendors.length;
+    var errs = validateDoc(doc);
+    if (errs.length) throw new Error(errs.slice(0, 3).join("; ") + (errs.length > 3 ? " (+" + (errs.length - 3) + " more)" : "") + ". Nothing was changed.");
+    var assessments = {};
+    Object.keys(doc.assessments || {}).forEach(function (id) {
+      var a = doc.assessments[id];
+      assessments[id] = { date: a.date || "", assessor: a.assessor || "", status: a.status || "Not started", answers: a.answers || {}, comments: a.comments || {}, override: a.override || "", overrideReason: a.overrideReason || "", clauses: a.clauses || {} };
+    });
+    state = { vendors: doc.vendors.map(function (v) { var o = {}; VENDOR_TEXT.forEach(function (k) { o[k] = v[k] == null ? "" : v[k]; }); return o; }), assessments: assessments, current: doc.current || "" };
+    return state.vendors.length;
   }
   function loadSample() {
     state = { vendors: JSON.parse(JSON.stringify(T.vendors)), assessments: {}, current: T.sample.vendor };
@@ -261,11 +322,11 @@
     $("#q-assessor").addEventListener("input", function (e) { var v = currentVendor(); if (v) { assessment(v.id).assessor = e.target.value; save(); } });
     $("#q-status").addEventListener("change", function (e) { var v = currentVendor(); if (v) { assessment(v.id).status = e.target.value; save(); renderDashboard(); } });
     $("#q-override").addEventListener("change", function (e) { var v = currentVendor(); if (v) { assessment(v.id).override = e.target.value; save(); renderQuestionnaire(); renderDashboard(); } });
-    $("#q-override-reason").addEventListener("input", function (e) { var v = currentVendor(); if (v) { assessment(v.id).overrideReason = e.target.value; save(); } });
+    $("#q-override-reason").addEventListener("input", function (e) { var v = currentVendor(); if (v) { var a = assessment(v.id); a.overrideReason = e.target.value; save(); syncOverride(v, a); renderDashboard(); } });
     $("#btn-add-vendor").addEventListener("click", function () { state.vendors.push(blankVendor()); save(); renderInventory(); renderVendorSelects(); renderDashboard(); });
     $("#btn-sample").addEventListener("click", function () { loadSample(); renderAll(); showTab("tab-dashboard"); $("#demo-banner").hidden = false; say("Sample loaded: six fictional vendors, worked questionnaire for " + T.sample.vendor + "."); });
     $("#btn-start-blank").addEventListener("click", function () { state = { vendors: [], assessments: {}, current: "" }; try { localStorage.removeItem(STORAGE); localStorage.setItem(BLANK_KEY, "1"); } catch (e) { /* ignore */ } $("#demo-banner").hidden = true; renderAll(); showTab("tab-inventory"); say("Blank assessment: add your vendors in the inventory."); });
-    $("#btn-export").addEventListener("click", function () { download("tprm-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify({ schema: SCHEMA, exported: new Date().toISOString(), vendors: state.vendors, assessments: state.assessments, current: state.current }, null, 2)); say("JSON exported."); });
+    $("#btn-export").addEventListener("click", function () { download("tprm-" + todayIso() + ".json", JSON.stringify({ schema: SCHEMA, exported: new Date().toISOString(), vendors: state.vendors, assessments: state.assessments, current: state.current }, null, 2)); say("JSON exported."); });
     $("#btn-export-csv").addEventListener("click", function () { download("tprm-summary.csv", summaryCsv(), "text/csv"); say("Summary CSV exported."); });
     $("#file-import").addEventListener("change", function (e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { try { var n = importDoc(JSON.parse(r.result)); save(); renderAll(); say("Imported " + n + " vendors."); } catch (err) { say("Import failed: " + err.message); } e.target.value = ""; }; r.readAsText(f); });
     $("#btn-print").addEventListener("click", function () { window.print(); });

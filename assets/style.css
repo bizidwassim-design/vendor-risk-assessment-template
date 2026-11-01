@@ -320,3 +320,5 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   :root:not([data-theme="dark"]) .tabs button:nth-child(4) { color:#965527; }
   :root:not([data-theme="dark"]) .tabs button[aria-selected="true"] { background:#d8e9ff; border-radius:10px 10px 0 0; }
 }
+/* Override reason missing: the override is ignored until a reason is given. */
+#q-override-reason[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent); }

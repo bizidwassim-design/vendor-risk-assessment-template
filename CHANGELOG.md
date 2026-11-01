@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Next-review dates are calendar dates computed without any UTC conversion, so a review set on 2026-10-12 with a 12-month cadence falls on 2027-10-12 in every timezone. Month ends are clamped (31 January + 1 month = 28 or 29 February).
+- Import validates the whole file (vendors, assessments, dates, ratings, override reasons) before it replaces anything; a bad file is rejected with the reasons and the current work is kept. Saved browser state goes through the same check.
+- An override needs a reason: without one it is ignored, the field is flagged and the computed rating stays final. The summary CSV now includes the override reason.
+
 ### Changed
 - The first visit opens on the fictional sample, with a banner and a *Start with a blank assessment* button that is remembered, so visitors see real-looking results straight away.
 
